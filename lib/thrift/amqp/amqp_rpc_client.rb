@@ -60,7 +60,7 @@ module Thrift
       @exchange                  = opts[:exchange] || nil
 
       @ch                        = @conn.create_channel
-      @service_exchange          = @exchange.nil? ? @ch.default_exchange : @ch.direct(@exchange, :durable => true)
+      @service_exchange          = @exchange.nil? ? @ch.default_exchange : @ch.direct(@exchange)
       @service_response_exchange = @ch.default_exchange
       @reply_queue               = @ch.queue("", :exclusive => true)
       @is_opened                 = true

@@ -30,7 +30,7 @@ module Thrift
 
       queue.subscribe(block: false) do |delivery_info, properties, payload|
         trans = MemoryBufferTransport.new(payload)
-        iprot = @iprot_factory(trans)
+        iprot = @iprot_factory.get_protocol(trans)
 
         @processor.process(iprot, nil)
 

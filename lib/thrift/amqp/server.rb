@@ -1,10 +1,13 @@
 require 'bunny'
 require 'thrift'
+require 'logger'
+
+LOGGER = Logger.new(STDOUT)
+LOGGER.level = Logger::INFO
 
 module Thrift
   class AMQPServer < BaseServer
-    def initialize(processor, iprot_factory, oprot_factory=nil, opts={})
-
+    def initialize(processor, iprot_factory, oprot_factory = nil, opts = {})
       @processor = processor
       @iprot_factory = iprot_factory
       @oprot_factory = oprot_factory || iprot_factory
@@ -28,22 +31,19 @@ module Thrift
 
       @channel.prefetch @prefetch
 
-      queue.subscribe(block: false) do |delivery_info, properties, payload|
+      queue.subscribe(
+        manual_ack: true,
+        block: true
+      ) do |delivery_info, _properties, payload|
         trans = MemoryBufferTransport.new(payload)
         iprot = @iprot_factory.get_protocol(trans)
 
-        @processor.process(iprot, nil)
-
-        @channel.acknowledge(delivery_info.delivery_tag, false)
-      end
-
-      loop do
-        sleep 5
-
-        if @channel.open?
-          @channel.close
-          @channel.open
+        begin
+          @processor.process(iprot, nil)
+        rescue => e
+          LOGGER.error("Processor failure #{e}")
         end
+        @channel.acknowledge(delivery_info.delivery_tag, false)
       end
     end
   end

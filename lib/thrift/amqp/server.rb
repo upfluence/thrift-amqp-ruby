@@ -17,14 +17,14 @@ module Thrift
     end
 
     def serve
-      @conn = Bunny.new(amqp_uri)
+      @conn = Bunny.new(@amqp_uri)
 
       @conn.start
       @channel = @conn.create_channel
 
       exchange = @channel.direct(@exchange_name)
-      queue = @channel.queue(queue_name)
-      queue.bind exchange
+      queue = @channel.queue(@queue_name)
+      queue.bind exchange, routing_key: @routing_key
 
       @channel.prefetch @prefetch
 
@@ -35,6 +35,15 @@ module Thrift
         @processor.process(iprot, nil)
 
         @channel.acknowledge(delivery_info.delivery_tag, false)
+      end
+
+      loop do
+        sleep 5
+
+        if @channel.open?
+          @channel.close
+          @channel.open
+        end
       end
     end
   end

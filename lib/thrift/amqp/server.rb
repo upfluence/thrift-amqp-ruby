@@ -31,20 +31,28 @@ module Thrift
 
       @channel.prefetch @prefetch
 
-      queue.subscribe(
-        manual_ack: true,
-        block: true
-      ) do |delivery_info, _properties, payload|
-        trans = MemoryBufferTransport.new(payload)
-        iprot = @iprot_factory.get_protocol(trans)
+      loop do
+        LOGGER.error("Fetching message from #{@queue_name}")
+        queue.subscribe(
+          manual_ack: true,
+          block: true
+        ) do |delivery_info, _properties, payload|
+          trans = MemoryBufferTransport.new(payload)
+          iprot = @iprot_factory.get_protocol(trans)
 
-        begin
-          @processor.process(iprot, nil)
-        rescue => e
-          LOGGER.error("Processor failure #{e}")
+          begin
+            @processor.process(iprot, nil)
+          rescue => e
+            LOGGER.error("Processor failure #{e}")
+          end
+          @channel.acknowledge(delivery_info.delivery_tag, false)
         end
-        @channel.acknowledge(delivery_info.delivery_tag, false)
       end
+    rescue Bunny::TCPConnectionFailedForAllHosts, Bunny::ConnectionClosedError
+      LOGGER.error("Can't establish the connection")
+      sleep 5
+
+      retry
     end
   end
 end

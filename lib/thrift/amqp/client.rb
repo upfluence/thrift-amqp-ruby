@@ -3,13 +3,13 @@ require 'thrift'
 require 'bunny'
 require 'stringio'
 require 'timeout'
-require 'uuidtools'
+require 'securerandom'
 
 module Thrift
   class AMQPClientTransport < BaseTransport
     def initialize(amqp_uri, exchange_name, routing_key)
       @outbuf = Bytes.empty_byte_buffer
-      @inbuf = Bytes.empty_byte_buffer
+      @inbuf = StringIO.new
       @conn = Bunny.new(amqp_uri)
       @queue = Queue.new
 
@@ -20,11 +20,14 @@ module Thrift
       unless @channel
         @conn.start
         @channel = @conn.create_channel
+        @service_exchange = @channel.exchange(@exchange_name)
         @reply_queue = @channel.queue("", auto_delete: true, exclusive: true)
 
-        @reply_queue.subscribe(block: false, ack: true) do |delivery_info, properties, payload|
+        @reply_queue.subscribe(block: false, manual_ack: true) do |delivery_info, properties, payload|
+          @inbuf.write payload
+          @inbuf.rewind
           @queue << true
-          @inbuf << payload
+          @channel.acknowledge(delivery_info.delivery_tag, false)
         end
       end
     end
@@ -42,8 +45,8 @@ module Thrift
     end
 
     def read(sz)
-      buf = @queue.pop
-      @inbuf.read sz
+      @queue.pop if @inbuf.eof?
+      @inbuf.read(sz)
     end
 
     def write(buf)
@@ -58,14 +61,13 @@ module Thrift
         reply_to: @reply_queue.name
       )
 
-
       @outbuf = Bytes.empty_byte_buffer
     end
 
-    prtected
+    protected
 
     def generate_uuid
-      UUIDTools::UUID.timestamp_create.to_s
+       SecureRandom.hex(13)
     end
   end
 end

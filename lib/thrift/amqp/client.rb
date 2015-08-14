@@ -54,6 +54,8 @@ module Thrift
     end
 
     def flush
+      open unless open?
+
       @service_exchange.publish(
         @outbuf,
         routing_key: @routing_key,

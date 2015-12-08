@@ -1,6 +1,7 @@
 require 'bunny'
 require 'thrift'
 require 'logger'
+require 'timeout'
 
 LOGGER = Logger.new(STDOUT)
 LOGGER.level = Logger::INFO
@@ -17,6 +18,7 @@ module Thrift
       @routing_key = opts[:routing_key]
       @exchange_name = opts[:exchange_name]
       @prefetch = opts[:prefetch]
+      @timeout = opts[:timeout]
     end
 
     def handle(delivery_info, properties, payload)
@@ -38,8 +40,6 @@ module Thrift
       rescue => e
         LOGGER.error("Processor failure #{e}")
       end
-
-      @channel.acknowledge(delivery_info.delivery_tag, false)
     end
 
     def serve
@@ -60,7 +60,22 @@ module Thrift
           manual_ack: true,
           block: true
         ) do |delivery_info, properties, payload|
-          handle delivery_info, properties, payload
+          begin
+            if @timeout
+              begin
+                Timeout.timeout(@timeout) do
+                  handle(delivery_info, properties, payload)
+                end
+              rescue Timeout::TimeoutError
+                LOGGER.info("Timeout raised")
+              end
+            else
+              handle delivery_info, properties, payload
+            end
+          rescue => e
+            LOGGER.info("Error happened: #{e}")
+          end
+          @channel.acknowledge(delivery_info.delivery_tag, false)
         end
       end
     rescue Bunny::TCPConnectionFailedForAllHosts, Bunny::ConnectionClosedError

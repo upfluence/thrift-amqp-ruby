@@ -66,7 +66,7 @@ module Thrift
                 Timeout.timeout(@timeout) do
                   handle(delivery_info, properties, payload)
                 end
-              rescue Timeout::TimeoutError
+              rescue Timeout::Error
                 LOGGER.info("Timeout raised")
               end
             else

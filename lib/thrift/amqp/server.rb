@@ -19,6 +19,7 @@ module Thrift
       @exchange_name = opts[:exchange_name]
       @prefetch = opts[:prefetch]
       @timeout = opts[:timeout]
+      @consumer_tag = opts[:consumer_tag]
     end
 
     def handle(delivery_info, properties, payload)
@@ -51,6 +52,7 @@ module Thrift
       exchange = @channel.direct(@exchange_name)
       queue = @channel.queue(@queue_name)
       queue.bind exchange, routing_key: @routing_key
+      @consumer_tag ||= @channel.generate_consumer_tag
 
       @channel.prefetch @prefetch
 
@@ -58,7 +60,8 @@ module Thrift
         LOGGER.info("Fetching message from #{@queue_name}")
         queue.subscribe(
           manual_ack: true,
-          block: true
+          block: true,
+          consumer_tag: @consumer_tag
         ) do |delivery_info, properties, payload|
           begin
             if @timeout

@@ -13,7 +13,9 @@ def run_server
     amqp_uri: ENV['RABBITMQ_URL'] || 'amqp://guest:guest@127.0.0.1:5672/%2f',
     routing_key: 'test',
     exchange_name: 'test',
-    queue_name: 'test', prefetch: ENV['PREFETCH'] || 1
+    queue_name: 'test',
+    prefetch: ENV['PREFETCH'] || 1,
+    consumer_tag: 'test'
   ).serve
 end
 

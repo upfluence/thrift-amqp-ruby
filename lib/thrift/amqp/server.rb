@@ -44,7 +44,7 @@ module Thrift
     end
 
     def serve
-      @conn = Bunny.new(@amqp_uri)
+      @conn = Bunny.new(@amqp_uri, continuation_timeout: @timeout * 1000)
 
       @conn.start
       @channel = @conn.create_channel

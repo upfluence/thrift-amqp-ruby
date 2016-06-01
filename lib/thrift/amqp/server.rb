@@ -17,9 +17,10 @@ module Thrift
       @amqp_uri = opts[:amqp_uri]
       @routing_key = opts[:routing_key]
       @exchange_name = opts[:exchange_name]
-      @prefetch = opts[:prefetch]
+      @prefetch = (ENV['QOS_SIZE'] || opts[:prefetch]).to_i
       @timeout = opts[:timeout]
       @consumer_tag = opts[:consumer_tag]
+      @fetching_disabled = ENV['RABBITMQ_QOS'] == '0'
     end
 
     def handle(delivery_info, properties, payload)
@@ -57,6 +58,12 @@ module Thrift
       @channel.prefetch @prefetch
 
       loop do
+        if @fetching_disabled
+          LOGGER.info("Fetching disabled")
+          sleep @timeout
+          next
+        end
+
         LOGGER.info("Fetching message from #{@queue_name}")
         queue.subscribe(
           manual_ack: true,

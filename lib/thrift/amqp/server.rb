@@ -20,7 +20,7 @@ module Thrift
       @prefetch = (ENV['QOS_SIZE'] || opts[:prefetch]).to_i
       @timeout = opts[:timeout]
       @consumer_tag = opts[:consumer_tag]
-      @fetching_disable = ENV['QOS_SIZE'] == '0'
+      @fetching_disabled = ENV['RABBITMQ_QOS'] == '0'
     end
 
     def handle(delivery_info, properties, payload)
@@ -58,8 +58,8 @@ module Thrift
       @channel.prefetch @prefetch
 
       loop do
-        if @fetching_disable
-          LOGGER.info("Fetching disable")
+        if @fetching_disabled
+          LOGGER.info("Fetching disabled")
           sleep @timeout
           next
         end

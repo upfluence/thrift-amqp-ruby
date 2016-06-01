@@ -61,7 +61,7 @@ module Thrift
         if @fetching_disable
           LOGGER.info("Fetching disable")
           sleep @timeout
-          continue
+          next
         end
 
         LOGGER.info("Fetching message from #{@queue_name}")

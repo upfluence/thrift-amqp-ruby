@@ -8,6 +8,8 @@ LOGGER.level = Logger::INFO
 
 module Thrift
   class AMQPServer < BaseServer
+    DEFAULT_TIMEOUT = 15_000 # 15s
+
     def initialize(processor, iprot_factory, oprot_factory = nil, opts = {})
       @processor = processor
       @iprot_factory = iprot_factory
@@ -18,7 +20,7 @@ module Thrift
       @routing_key = opts[:routing_key]
       @exchange_name = opts[:exchange_name]
       @prefetch = (ENV['QOS_SIZE'] || opts[:prefetch]).to_i
-      @timeout = opts[:timeout]
+      @timeout = opts[:timeout] ? opts[:timeout] * 1000 : DEFAULT_TIMEOUT
       @consumer_tag = opts[:consumer_tag]
       @fetching_disabled = ENV['RABBITMQ_QOS'] == '0'
     end

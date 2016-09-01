@@ -50,7 +50,7 @@ module Thrift
       @conn = Bunny.new(@amqp_uri, continuation_timeout: @timeout * 1000)
 
       @conn.start
-      @channel = @conn.create_channel
+      @channel = @conn.create_channel(nil, @prefetch == 0 ? 1 : @prefetch)
 
       exchange = @channel.direct(@exchange_name)
       queue = @channel.queue(@queue_name)

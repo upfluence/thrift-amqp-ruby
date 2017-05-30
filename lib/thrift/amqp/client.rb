@@ -22,11 +22,10 @@ module Thrift
       @conn.start
       @channel = @conn.create_channel
       @service_exchange = @channel.exchange(@exchange_name)
-      @reply_queue = @channel.queue("", auto_delete: true, exclusive: true)
+      @reply_queue = @channel.queue('', auto_delete: true, exclusive: true)
 
       @reply_queue.subscribe(block: false, manual_ack: true) do |delivery_info, properties, payload|
         @inbuf.write payload
-        @inbuf.rewind
         @queue << true
         @channel.acknowledge(delivery_info.delivery_tag, false)
       end

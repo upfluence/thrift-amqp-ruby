@@ -9,9 +9,8 @@ module Thrift
   class AMQPClientTransport < BaseTransport
     def initialize(amqp_uri, exchange_name, routing_key)
       @outbuf = Bytes.empty_byte_buffer
-      @inbuf = StringIO.new
+      @inbuf_r, @inbuf_w = IO.pipe
       @conn = Bunny.new(amqp_uri)
-      @queue = Queue.new
 
       @exchange_name, @routing_key = exchange_name, routing_key
     end
@@ -25,8 +24,7 @@ module Thrift
       @reply_queue = @channel.queue('', auto_delete: true, exclusive: true)
 
       @reply_queue.subscribe(block: false, manual_ack: true) do |delivery_info, properties, payload|
-        @inbuf.write payload
-        @queue << true
+        @inbuf_w << Bytes.force_binary_encoding(payload)
         @channel.acknowledge(delivery_info.delivery_tag, false)
       end
     end
@@ -44,8 +42,7 @@ module Thrift
     end
 
     def read(sz)
-      @queue.pop if @inbuf.eof?
-      @inbuf.read(sz)
+      @inbuf_r.read(sz)
     end
 
     def write(buf)
@@ -58,7 +55,7 @@ module Thrift
       @service_exchange.publish(
         @outbuf,
         routing_key: @routing_key,
-        correlation_id: self.generate_uuid,
+        correlation_id: generate_uuid,
         reply_to: @reply_queue.name
       )
 

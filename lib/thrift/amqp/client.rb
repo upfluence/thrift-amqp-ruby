@@ -9,7 +9,8 @@ module Thrift
   class AMQPClientTransport < BaseTransport
     def initialize(amqp_uri, exchange_name, routing_key)
       @outbuf = Bytes.empty_byte_buffer
-      @inbuf_r, @inbuf_w = IO.pipe
+      @inbuf_r, @inbuf_w = IO.pipe(binmode: true)
+      @inbuf_w.set_encoding('binary')
       @conn = Bunny.new(amqp_uri)
 
       @exchange_name, @routing_key = exchange_name, routing_key

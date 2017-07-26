@@ -7,20 +7,43 @@ require 'securerandom'
 
 module Thrift
   class AMQPClientTransport < BaseTransport
-    def initialize(amqp_uri, exchange_name, routing_key)
+    class << self
+      def from_channel(channel, exchange_name, routing_key)
+        new(nil, exchange_name, routing_key, channel: channel)
+      end
+    end
+
+    def initialize(amqp_uri, exchange_name, routing_key, opts = {})
       @outbuf = Bytes.empty_byte_buffer
       @inbuf_r, @inbuf_w = IO.pipe(binmode: true)
       @inbuf_w.set_encoding('binary')
-      @conn = Bunny.new(amqp_uri)
 
-      @exchange_name, @routing_key = exchange_name, routing_key
+      if opts[:channel]
+        @channel = opts[:channel]
+      else
+        @conn = Bunny.new(amqp_uri)
+      end
+
+      @opened = false
+      @handle_conn_lifecycle = opts[:channel].nil?
+      @exchange_name = exchange_name
+      @routing_key = routing_key
     end
 
     def open
       return if open?
 
-      @conn.start
-      @channel = @conn.create_channel
+      if @channel.nil? || !@channel.open?
+        unless @conn
+          raise TransportException.new(
+            TransportException::NOT_OPEN, 'channel cosed'
+          )
+        end
+
+        @conn.start
+        @channel = @conn.create_channel
+      end
+
       @service_exchange = @channel.exchange(@exchange_name)
       @reply_queue = @channel.queue('', auto_delete: true, exclusive: true)
 
@@ -28,18 +51,20 @@ module Thrift
         @inbuf_w << Bytes.force_binary_encoding(payload)
         @channel.acknowledge(delivery_info.delivery_tag, false)
       end
+      @opened = true
     end
 
 
     def close
       if open?
         @reply_queue.delete
-        @channel.close
+        @channel.close if @handle_conn_lifecycle
+        @opened = false
       end
     end
 
     def open?
-      @channel && @channel.open?
+      @opened && @channel && @channel.open?
     end
 
     def read(sz)
@@ -66,7 +91,7 @@ module Thrift
     protected
 
     def generate_uuid
-       SecureRandom.hex(13)
+      SecureRandom.hex(13)
     end
   end
 end

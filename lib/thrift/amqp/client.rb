@@ -28,6 +28,7 @@ module Thrift
       @handle_conn_lifecycle = opts[:channel].nil?
       @exchange_name = exchange_name
       @routing_key = routing_key
+      @oneway = opts.fetch(:oneway, false)
     end
 
     def open
@@ -45,11 +46,16 @@ module Thrift
       end
 
       @service_exchange = @channel.exchange(@exchange_name)
-      @reply_queue = @channel.queue('', auto_delete: true, exclusive: true)
 
-      @reply_queue.subscribe(block: false, manual_ack: true) do |delivery_info, properties, payload|
-        @inbuf_w << Bytes.force_binary_encoding(payload)
-        @channel.acknowledge(delivery_info.delivery_tag, false)
+      unless @oneway
+        @reply_queue = @channel.queue('', auto_delete: true, exclusive: true)
+
+        @reply_queue.subscribe(
+          block: false, manual_ack: true
+        ) do |delivery_info, properties, payload|
+          @inbuf_w << Bytes.force_binary_encoding(payload)
+          @channel.acknowledge(delivery_info.delivery_tag, false)
+        end
       end
       @opened = true
     end
@@ -57,7 +63,7 @@ module Thrift
 
     def close
       if open?
-        @reply_queue.delete
+        @reply_queue.delete unless @oneway
         @channel.close if @handle_conn_lifecycle
         @opened = false
       end
@@ -82,7 +88,7 @@ module Thrift
         @outbuf,
         routing_key: @routing_key,
         correlation_id: generate_uuid,
-        reply_to: @reply_queue.name
+        reply_to: @oneway ? '' : @reply_queue.name
       )
 
       @outbuf = Bytes.empty_byte_buffer

@@ -23,6 +23,7 @@ module Thrift
       @timeout = opts[:timeout] ? opts[:timeout] * 1000 : DEFAULT_TIMEOUT
       @consumer_tag = opts[:consumer_tag]
       @fetching_disabled = ENV['RABBITMQ_QOS'] == '0'
+      @queue_declare_args = opts[:queue_declare_args] || { durable: true }
     end
 
     def handle(delivery_info, properties, payload)
@@ -53,7 +54,7 @@ module Thrift
       @channel = @conn.create_channel(nil, @prefetch == 0 ? 1 : @prefetch)
 
       exchange = @channel.direct(@exchange_name)
-      queue = @channel.queue(@queue_name)
+      queue = @channel.queue(@queue_name, @queue_declare_args)
       queue.bind exchange, routing_key: @routing_key
       @consumer_tag ||= @channel.generate_consumer_tag
 
